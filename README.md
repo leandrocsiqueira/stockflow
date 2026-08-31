@@ -1,56 +1,80 @@
 # StockFlow
 
-Inventory management REST API — products, warehouses, stock movements, consolidated balances, and automatic reorder requests.
+Inventory management REST API for products, warehouses, stock movements, stock balances, and automatic replenishment orders.
 
-## Why this project
+## About
 
-Built to demonstrate the parts of backend engineering that don't show up in a basic CRUD demo: schema evolution with versioned migrations, dynamic query composition, and integration tests that run against a real database instead of mocks.
+StockFlow is a backend portfolio project focused on inventory management and business rules beyond basic CRUD operations.
+
+The application supports product and warehouse management, stock IN/OUT movements, consolidated balances, automatic replenishment orders, dynamic filtering, pagination, standardized API errors, and OpenAPI documentation.
 
 ## Stack
 
-- Java 21 / Spring Boot 3.3
-- PostgreSQL 16
-- Flyway (versioned schema migrations — Hibernate `ddl-auto` is set to `validate`, not `update`; the schema is owned by SQL migrations, the way it should be in a real system)
-- Spring Data JPA + JPA Specifications (dynamic, composable filtering)
-- Testcontainers (integration tests run against a real Postgres container, migrated by Flyway, not H2 or mocks)
-- SpringDoc OpenAPI (Swagger UI)
+| Technology | Version |
+|---|---|
+| Java | 25 |
+| Spring Boot | 3.5.16 |
+| PostgreSQL | 16 |
+| Testcontainers | 1.20.1 |
+| SpringDoc OpenAPI | 2.8.17 |
 
-## Domain & business rules
+The project also uses Spring Web, Spring Data JPA, Hibernate, Bean Validation, Flyway, JPA Specifications, JUnit 5, Mockito, and MockMvc.
 
-- **Stock** is a consolidated balance per product/warehouse pair, protected by optimistic locking (`@Version`) to catch concurrent-update conflicts.
-- **StockMovement** is an immutable audit trail — every IN/OUT is recorded and never edited.
-- An `OUT` movement that would take the balance negative is rejected — balance can never go below zero.
-- When a movement drops a product's balance below its configured minimum stock, a **ReplenishmentOrder** is created automatically — but only if one isn't already pending for that product/warehouse, to avoid duplicate reorder requests.
-- Movement history can be filtered dynamically (product, warehouse, type, date range) via **JPA Specifications**, composed from small reusable predicates instead of one bloated repository method per filter combination.
+Database schema evolution is managed by Flyway. Hibernate `ddl-auto` is configured as `validate`.
 
-## Running locally
+## Business rules
 
-```bash
-docker-compose up -d          # starts PostgreSQL on localhost:5432
-mvn flyway:migrate            # optional - Flyway also runs automatically on app startup
-mvn spring-boot:run           # starts the API on http://localhost:8080
-```
+Stock is maintained per product and warehouse, with optimistic locking through `@Version`.
 
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+Every IN or OUT operation creates an immutable stock movement. OUT movements cannot produce negative stock.
 
-## Running the tests
+When the balance falls below the configured minimum stock, a replenishment order is automatically created if another pending order does not already exist for the same product and warehouse.
 
-```bash
-mvn test
-```
+Movement history supports dynamic filtering by product, warehouse, movement type, and date range using JPA Specifications.
 
-The integration test (`StockMovementIntegrationTest`) spins up a real PostgreSQL container via Testcontainers, runs the actual Flyway migrations against it, and exercises the full Spring context — not mocked repositories. Requires Docker running locally.
-
-## API overview
+## API
 
 | Resource | Endpoints |
 |---|---|
 | Products | `POST/GET /api/products`, `GET/PUT /api/products/{id}` |
 | Warehouses | `POST/GET /api/warehouses` |
-| Stock movements | `POST /api/stock/movements`, `GET /api/stock/movements` (filterable + paginated) |
-| Stock balance | `GET /api/stock/balance?productId=&warehouseId=`, `GET /api/stock/balance/product/{productId}` |
+| Stock movements | `POST /api/stock/movements`, `GET /api/stock/movements` |
+| Stock balance | `GET /api/stock/balance`, `GET /api/stock/balance/product/{productId}` |
 | Replenishment orders | `GET /api/replenishment-orders/pending`, `POST /api/replenishment-orders/{id}/complete` |
+
+Stock movement history supports filtering, sorting, and pagination.
+
+The API also provides standardized responses for validation errors, malformed JSON, missing resources, and business rule conflicts.
+
+## Running locally
+
+```bash
+docker-compose up -d
+mvn spring-boot:run
+```
+
+Swagger UI:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+OpenAPI specification:
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
+## Tests
+
+Docker must be running for the Testcontainers integration tests.
+
+```bash
+mvn clean test
+```
+
+The test suite includes unit tests, MockMvc controller tests, repository tests, and integration tests against PostgreSQL with Flyway migrations.
 
 ## Status
 
-Actively maintained portfolio project.
+Version 1.0.0 - portfolio release.

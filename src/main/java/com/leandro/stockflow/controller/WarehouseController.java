@@ -2,7 +2,13 @@ package com.leandro.stockflow.controller;
 
 import com.leandro.stockflow.dto.WarehouseRequest;
 import com.leandro.stockflow.dto.WarehouseResponse;
+import com.leandro.stockflow.exception.ApiError;
 import com.leandro.stockflow.service.WarehouseService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -16,9 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/warehouses")
-@Tag(name = "Warehouses")
+@Tag(name = "Warehouses", description = "Warehouse registration and listing operations")
 public class WarehouseController {
-
   private final WarehouseService warehouseService;
 
   public WarehouseController(WarehouseService warehouseService) {
@@ -26,11 +31,21 @@ public class WarehouseController {
   }
 
   @PostMapping
+  @Operation(summary = "Create a warehouse")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Warehouse created successfully"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Invalid request",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+  })
   public ResponseEntity<WarehouseResponse> create(@Valid @RequestBody WarehouseRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(warehouseService.create(request));
   }
 
   @GetMapping
+  @Operation(summary = "List warehouses")
+  @ApiResponse(responseCode = "200", description = "Warehouses retrieved successfully")
   public ResponseEntity<List<WarehouseResponse>> findAll() {
     return ResponseEntity.ok(warehouseService.findAll());
   }
