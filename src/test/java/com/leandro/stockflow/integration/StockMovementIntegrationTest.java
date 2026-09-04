@@ -9,6 +9,8 @@ import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
 import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
+import com.leandro.stockflow.dto.StockTransferRequest;
+import com.leandro.stockflow.dto.StockTransferResponse;
 import com.leandro.stockflow.dto.CreateWarehouseRequest;
 import com.leandro.stockflow.dto.WarehouseResponse;
 import com.leandro.stockflow.entity.MovementType;
@@ -175,6 +177,123 @@ class StockMovementIntegrationTest {
     assertThat(mainBalance.targetStock()).isEqualTo(30);
     assertThat(secondaryBalance.reorderPoint()).isEqualTo(5);
     assertThat(secondaryBalance.targetStock()).isEqualTo(12);
+  }
+
+  @Test
+  void shouldTransferStockAtomicallyBetweenWarehouses() {
+    WarehouseResponse secondaryWarehouse =
+        warehouseService.create(new CreateWarehouseRequest("Transfer Destination", "MG"));
+
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-T1"));
+
+    StockTransferResponse transfer =
+        stockService.transfer(
+            new StockTransferRequest(
+                productId,
+                warehouseId,
+                secondaryWarehouse.id(),
+                20,
+                "Internal transfer",
+                "TRF-001"));
+
+    assertThat(transfer.sourceBalance()).isEqualTo(30);
+    assertThat(transfer.destinationBalance()).isEqualTo(20);
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(30);
+    assertThat(stockService.getBalance(productId, secondaryWarehouse.id()).quantity()).isEqualTo(20);
+
+    var transferMovements =
+        stockService.findMovements(productId, null, null, null, null, PageRequest.of(0, 100)).stream()
+            .filter(movement -> "TRF-001".equals(movement.reference()))
+            .toList();
+
+    assertThat(transferMovements).hasSize(2);
+    assertThat(transferMovements)
+        .extracting(StockMovementResponse::type)
+        .containsExactlyInAnyOrder(MovementType.OUT, MovementType.IN);
+    assertThat(transferMovements)
+        .extracting(StockMovementResponse::quantity)
+        .containsOnly(20);
+  }
+
+  @Test
+  void shouldRollbackTransferWhenSourceStockIsInsufficient() {
+    WarehouseResponse secondaryWarehouse =
+        warehouseService.create(new CreateWarehouseRequest("Rollback Destination", "PR"));
+
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 10, "purchase", "PO-T2"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, secondaryWarehouse.id(), 0, 0));
+
+    assertThatThrownBy(
+            () ->
+                stockService.transfer(
+                    new StockTransferRequest(
+                        productId,
+                        warehouseId,
+                        secondaryWarehouse.id(),
+                        20,
+                        "Invalid transfer",
+                        "TRF-ROLLBACK")))
+        .isInstanceOf(BusinessRuleException.class)
+        .hasMessageContaining("Insufficient stock");
+
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(10);
+    assertThat(stockService.getBalance(productId, secondaryWarehouse.id()).quantity()).isZero();
+
+    var transferMovements =
+        stockService.findMovements(productId, null, null, null, null, PageRequest.of(0, 100)).stream()
+            .filter(movement -> "TRF-ROLLBACK".equals(movement.reference()))
+            .toList();
+    assertThat(transferMovements).isEmpty();
+  }
+
+  @Test
+  void shouldRejectTransferToSameWarehouseWithoutChangingStock() {
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 25, "purchase", "PO-T3"));
+
+    assertThatThrownBy(
+            () ->
+                stockService.transfer(
+                    new StockTransferRequest(
+                        productId,
+                        warehouseId,
+                        warehouseId,
+                        5,
+                        "Invalid transfer",
+                        "TRF-SAME")))
+        .isInstanceOf(BusinessRuleException.class)
+        .hasMessage("Source and destination warehouses must be different");
+
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(25);
+  }
+
+  @Test
+  void shouldTriggerSourceReplenishmentAfterTransfer() {
+    WarehouseResponse secondaryWarehouse =
+        warehouseService.create(new CreateWarehouseRequest("Replenishment Destination", "SC"));
+
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-T4"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 40, 100));
+
+    stockService.transfer(
+        new StockTransferRequest(
+            productId,
+            warehouseId,
+            secondaryWarehouse.id(),
+            20,
+            "Internal transfer",
+            "TRF-REPLENISH"));
+
+    String productSku = productRepository.findById(productId).orElseThrow().getSku();
+    assertThat(replenishmentOrderService.findPending())
+        .anyMatch(
+            order ->
+                order.productSku().equals(productSku)
+                    && order.warehouseName().equals("Main Warehouse")
+                    && order.requestedQuantity() == 70);
   }
 
   @Test

@@ -87,4 +87,25 @@ The later V2 replenishment stage will make receiving and cancellation operationa
 
 The important consistency boundary is the Product + Warehouse stock record. Inventory writes use a locking strategy around this record so concurrent operations cannot casually overwrite the same balance.
 
-Future warehouse transfers will coordinate two such stock records inside one transaction and will use a deterministic locking order to reduce deadlock risk.
+Warehouse transfers coordinate two such stock records inside one transaction and use a deterministic locking order to reduce deadlock risk.
+
+## Warehouse Transfer
+
+A warehouse transfer is one business operation that changes two Stock records for the same Product. It is not modeled as two independent API calls.
+
+```text
+Source Stock       Destination Stock
+    -20                  +20
+      \                  /
+       OUT            IN
+          \          /
+          same reference
+```
+
+The operation is transactional. If the source has insufficient quantity, the destination is not increased and no transfer movement history is committed.
+
+Both movement records use the same transfer reference and timestamp, making the two sides traceable in stock history. Transfer references become idempotency-aware in a later V2 stage.
+
+Transfers may also affect replenishment policy. If the source quantity falls below its reorder point after the transfer, the normal replenishment rule is evaluated for that Product + Warehouse pair.
+
+To reduce deadlock risk, StockFlow acquires existing stock locks in deterministic warehouse-id order rather than source/destination request order.

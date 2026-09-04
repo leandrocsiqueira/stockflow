@@ -4,6 +4,8 @@ import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
 import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
+import com.leandro.stockflow.dto.StockTransferRequest;
+import com.leandro.stockflow.dto.StockTransferResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.entity.Product;
 import com.leandro.stockflow.entity.ReplenishmentOrder;
@@ -11,6 +13,7 @@ import com.leandro.stockflow.entity.ReplenishmentStatus;
 import com.leandro.stockflow.entity.Stock;
 import com.leandro.stockflow.entity.StockMovement;
 import com.leandro.stockflow.entity.Warehouse;
+import com.leandro.stockflow.exception.BusinessRuleException;
 import com.leandro.stockflow.exception.ResourceNotFoundException;
 import com.leandro.stockflow.mapper.StockMapper;
 import com.leandro.stockflow.mapper.StockMovementMapper;
@@ -112,6 +115,103 @@ public class StockService {
           new ReplenishmentOrder(product, warehouse, requestedQuantity);
       replenishmentOrderRepository.save(order);
     }
+  }
+
+  @Transactional
+  public StockTransferResponse transfer(StockTransferRequest request) {
+    if (request.sourceWarehouseId().equals(request.destinationWarehouseId())) {
+      throw new BusinessRuleException("Source and destination warehouses must be different");
+    }
+
+    Product product =
+        productRepository
+            .findById(request.productId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Product not found with id: " + request.productId()));
+
+    Warehouse sourceWarehouse = findWarehouse(request.sourceWarehouseId());
+    Warehouse destinationWarehouse = findWarehouse(request.destinationWarehouseId());
+
+    Stock sourceStock;
+    Stock destinationStock;
+
+    if (sourceWarehouse.getId() < destinationWarehouse.getId()) {
+      sourceStock = requireStockForUpdate(product, sourceWarehouse, request.quantity());
+      destinationStock = getOrCreateStockForUpdate(product, destinationWarehouse);
+    } else {
+      destinationStock = getOrCreateStockForUpdate(product, destinationWarehouse);
+      sourceStock = requireStockForUpdate(product, sourceWarehouse, request.quantity());
+    }
+
+    sourceStock.decrease(request.quantity());
+    destinationStock.increase(request.quantity());
+
+    LocalDateTime occurredAt = LocalDateTime.now(clock);
+    StockMovement sourceMovement =
+        movementRepository.save(
+            new StockMovement(
+                product,
+                sourceWarehouse,
+                MovementType.OUT,
+                request.quantity(),
+                request.reason(),
+                request.reference(),
+                occurredAt));
+    StockMovement destinationMovement =
+        movementRepository.save(
+            new StockMovement(
+                product,
+                destinationWarehouse,
+                MovementType.IN,
+                request.quantity(),
+                request.reason(),
+                request.reference(),
+                occurredAt));
+
+    if (sourceStock.isBelowReorderPoint()) {
+      triggerReplenishmentIfNeeded(product, sourceWarehouse, sourceStock);
+    }
+    if (destinationStock.isBelowReorderPoint()) {
+      triggerReplenishmentIfNeeded(product, destinationWarehouse, destinationStock);
+    }
+
+    return new StockTransferResponse(
+        sourceMovement.getId(),
+        destinationMovement.getId(),
+        product.getSku(),
+        product.getName(),
+        sourceWarehouse.getName(),
+        destinationWarehouse.getName(),
+        request.quantity(),
+        request.reason(),
+        request.reference(),
+        sourceStock.getQuantity(),
+        destinationStock.getQuantity(),
+        occurredAt);
+  }
+
+  private Warehouse findWarehouse(Long warehouseId) {
+    return warehouseRepository
+        .findById(warehouseId)
+        .orElseThrow(
+            () -> new ResourceNotFoundException("Warehouse not found with id: " + warehouseId));
+  }
+
+  private Stock requireStockForUpdate(Product product, Warehouse warehouse, int requestedQuantity) {
+    return stockRepository
+        .findForUpdate(product.getId(), warehouse.getId())
+        .orElseThrow(
+            () ->
+                new BusinessRuleException(
+                    "Insufficient stock: available 0, requested " + requestedQuantity));
+  }
+
+  private Stock getOrCreateStockForUpdate(Product product, Warehouse warehouse) {
+    return stockRepository
+        .findForUpdate(product.getId(), warehouse.getId())
+        .orElseGet(() -> stockRepository.save(new Stock(product, warehouse)));
   }
 
   @Transactional

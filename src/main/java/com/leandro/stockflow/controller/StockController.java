@@ -5,6 +5,8 @@ import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
 import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
+import com.leandro.stockflow.dto.StockTransferRequest;
+import com.leandro.stockflow.dto.StockTransferResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.exception.ApiError;
 import com.leandro.stockflow.service.StockService;
@@ -35,7 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/stock")
-@Tag(name = "Stock", description = "Stock movements, balances, and movement history")
+@Tag(
+    name = "Stock",
+    description = "Stock movements, transfers, balances, policies, and movement history")
 public class StockController {
 
   private final StockService stockService;
@@ -64,6 +68,31 @@ public class StockController {
   public ResponseEntity<StockMovementResponse> registerMovement(
       @Valid @RequestBody StockMovementRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(stockService.registerMovement(request));
+  }
+
+  @PostMapping("/transfers")
+  @Operation(
+      summary = "Transfer stock between warehouses",
+      description =
+          "Moves one product between two warehouses atomically and records both movement sides")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Stock transfer completed successfully"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Invalid transfer request",
+        content = @Content(schema = @Schema(implementation = ApiError.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Product or warehouse not found",
+        content = @Content(schema = @Schema(implementation = ApiError.class))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Transfer violates a business rule",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+  })
+  public ResponseEntity<StockTransferResponse> transfer(
+      @Valid @RequestBody StockTransferRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(stockService.transfer(request));
   }
 
   @GetMapping("/movements")

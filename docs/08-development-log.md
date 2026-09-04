@@ -246,3 +246,56 @@ mvn clean test
 ### Next stage
 
 After this migration is green, the next major use case is an atomic warehouse transfer. It will move the same product between two warehouses in one transaction and record both sides of the operation in movement history.
+
+## Stage 4 - Atomic warehouse transfers
+
+### Problem
+
+V1 could move inventory between warehouses only by issuing an OUT movement and a separate IN movement. If one operation succeeded and the other failed, the balances could diverge and the history would not represent one atomic business operation.
+
+### Decision
+
+V2 introduces `POST /api/stock/transfers`. A transfer moves one product from a source warehouse to a destination warehouse inside one database transaction. Source and destination must be different, quantity must be positive, and the source must have enough stock.
+
+Both movement records share the same required `reference`, which correlates the OUT and IN sides in movement history. Reference uniqueness is intentionally deferred to the idempotency stage.
+
+### Concurrency strategy
+
+When both stock records already exist, they are locked in ascending warehouse-id order rather than request order. This deterministic order reduces deadlock risk for concurrent inverse transfers such as warehouse A to B and warehouse B to A. A destination stock record is created when the product has never existed there.
+
+### Transactional behavior
+
+The source balance is decreased and the destination balance is increased in the same transaction. The service then records one OUT movement for the source and one IN movement for the destination using the same timestamp and reference. If any business rule fails, the transaction rolls back.
+
+After the balance change, replenishment policy is reevaluated for both locations. This allows an outgoing transfer to trigger replenishment at the source if its remaining quantity falls below the reorder point.
+
+### API example
+
+```json
+{
+  "productId": 1,
+  "sourceWarehouseId": 1,
+  "destinationWarehouseId": 2,
+  "quantity": 20,
+  "reason": "Internal transfer",
+  "reference": "TRF-001"
+}
+```
+
+The response exposes both generated movement IDs, both resulting balances and the common transfer reference.
+
+### Tests
+
+Controller tests verify the HTTP contract and validation of the required reference. Testcontainers integration tests verify successful transfer, rollback on insufficient stock, rejection of a same-warehouse transfer and automatic source replenishment after a transfer.
+
+### Validation
+
+Run the complete Maven test suite with Docker available.
+
+```text
+mvn clean test
+```
+
+### Next stage
+
+The next stage completes the replenishment lifecycle. Pending orders will support cancellation and receiving. Receiving a replenishment will create the physical IN movement and complete the order in the same transaction.

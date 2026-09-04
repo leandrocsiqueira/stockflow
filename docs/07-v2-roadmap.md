@@ -9,18 +9,15 @@ Version 2 improves the quality of the existing system before adding broad new sc
 | Phase | Main outcome | Status |
 |---|---|---|
 | 0 | Freeze V1, start V2 branch, normalize line endings and establish documentation | Completed |
-| 1 | Refactor Product contracts and establish the V2 package/code pattern | Completed |
+| 1 | Refactor Product contracts and establish the V2 code pattern | Completed |
 | 2 | Improve Warehouse management API and contracts | Completed |
-| 3 | Move inventory policy from global product minimum to product plus warehouse policy | In progress |
-| 4 | Introduce reorder point and target stock | In progress |
-| 5 | Implement atomic warehouse transfers | Planned |
-| 6 | Complete replenishment lifecycle with cancellation and stock receiving | Planned |
-| 7 | Add idempotency to critical inventory operations | Planned |
-| 8 | Improve queries for low stock, products and warehouses | Planned |
-| 9 | Strengthen exception handling, concurrency tests and integration tests | Planned |
-| 10 | Add Actuator, CI and coverage reporting | Planned |
-| 11 | Review whether authentication and authorization belong in V2 or V2.1 | Planned |
-| 12 | Final regression, documentation review and release 2.0.0 | Planned |
+| 3 | Move inventory policy to Product + Warehouse with reorder point and target stock | Completed |
+| 4 | Implement atomic warehouse transfers | In progress |
+| 5 | Complete replenishment lifecycle with cancellation and stock receiving | Planned |
+| 6 | Add idempotency to critical inventory operations | Planned |
+| 7 | Improve queries for low stock, products and warehouses | Planned |
+| 8 | Strengthen exception handling, concurrency tests and integration tests | Planned |
+| 9 | Add Actuator, CI and code-quality checks | Planned |
 
 ## V2 domain changes under evaluation
 
@@ -56,9 +53,9 @@ V2 will make the lifecycle operational. Receiving a replenishment must generate 
 
 ## Warehouse transfers
 
-V2 will add a transfer operation that removes inventory from the source warehouse and adds inventory to the destination warehouse atomically.
+V2 adds a transfer operation that removes inventory from the source warehouse and adds inventory to the destination warehouse atomically.
 
-The operation must be all-or-nothing. It will also provide a practical place to document transaction boundaries, locking order and concurrency behavior.
+The operation is all-or-nothing and provides a practical place to document transaction boundaries, locking order and concurrency behavior.
 
 ## Idempotency
 
