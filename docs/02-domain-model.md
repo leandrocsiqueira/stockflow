@@ -81,7 +81,9 @@ if quantity < reorderPoint:
     requestedQuantity = targetStock - quantity
 ```
 
-The later V2 replenishment stage will make receiving and cancellation operational. At the current stage, automatic creation is already based on the new per-location inventory policy.
+A pending replenishment has two terminal outcomes. Cancellation changes the order to `CANCELLED` without changing inventory. Receiving changes the order to `COMPLETED`, adds the requested quantity to the Product + Warehouse stock record and records an immutable `IN` movement in the same transaction.
+
+Receiving uses a generated movement reference in the form `REPLENISHMENT-{orderId}`. A completed or cancelled order cannot be received again, so retrying the lifecycle operation cannot apply the same order quantity twice. General request idempotency for externally supplied movement and transfer references is handled in a later V2 stage.
 
 ## Aggregate behavior
 

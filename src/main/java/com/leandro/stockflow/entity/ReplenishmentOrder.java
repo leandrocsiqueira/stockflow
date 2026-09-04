@@ -43,9 +43,17 @@ public class ReplenishmentOrder {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
+  @Column(name = "cancelled_at")
+  private LocalDateTime cancelledAt;
+
   protected ReplenishmentOrder() {}
 
   public ReplenishmentOrder(Product product, Warehouse warehouse, int requestedQuantity) {
+    this(product, warehouse, requestedQuantity, LocalDateTime.now());
+  }
+
+  public ReplenishmentOrder(
+      Product product, Warehouse warehouse, int requestedQuantity, LocalDateTime createdAt) {
     if (product == null) {
       throw new IllegalArgumentException("Product is required");
     }
@@ -55,19 +63,39 @@ public class ReplenishmentOrder {
     if (requestedQuantity <= 0) {
       throw new IllegalArgumentException("Requested quantity must be positive");
     }
+    if (createdAt == null) {
+      throw new IllegalArgumentException("Created timestamp is required");
+    }
     this.product = product;
     this.warehouse = warehouse;
     this.requestedQuantity = requestedQuantity;
     this.status = ReplenishmentStatus.PENDING;
-    this.createdAt = LocalDateTime.now();
+    this.createdAt = createdAt;
   }
 
-  public void complete() {
-    if (status != ReplenishmentStatus.PENDING) {
-      throw new BusinessRuleException("Only pending replenishment orders can be completed");
+  public void complete(LocalDateTime completedAt) {
+    requirePending("completed");
+    if (completedAt == null) {
+      throw new IllegalArgumentException("Completed timestamp is required");
     }
     this.status = ReplenishmentStatus.COMPLETED;
-    this.completedAt = LocalDateTime.now();
+    this.completedAt = completedAt;
+  }
+
+  public void cancel(LocalDateTime cancelledAt) {
+    requirePending("cancelled");
+    if (cancelledAt == null) {
+      throw new IllegalArgumentException("Cancelled timestamp is required");
+    }
+    this.status = ReplenishmentStatus.CANCELLED;
+    this.cancelledAt = cancelledAt;
+  }
+
+  private void requirePending(String action) {
+    if (status != ReplenishmentStatus.PENDING) {
+      throw new BusinessRuleException(
+          "Only pending replenishment orders can be " + action);
+    }
   }
 
   public Long getId() {
@@ -96,5 +124,9 @@ public class ReplenishmentOrder {
 
   public LocalDateTime getCompletedAt() {
     return completedAt;
+  }
+
+  public LocalDateTime getCancelledAt() {
+    return cancelledAt;
   }
 }

@@ -11,4 +11,5 @@ public record ReplenishmentOrderResponse(
     int requestedQuantity,
     ReplenishmentStatus status,
     LocalDateTime createdAt,
-    LocalDateTime completedAt) {}
+    LocalDateTime completedAt,
+    LocalDateTime cancelledAt) {}

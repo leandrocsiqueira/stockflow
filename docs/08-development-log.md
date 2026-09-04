@@ -299,3 +299,72 @@ mvn clean test
 ### Next stage
 
 The next stage completes the replenishment lifecycle. Pending orders will support cancellation and receiving. Receiving a replenishment will create the physical IN movement and complete the order in the same transaction.
+
+## Stage 5 - Operational replenishment lifecycle
+
+### Problem
+
+V1 exposed `PENDING`, `COMPLETED` and `CANCELLED`, but only completion had a service operation. Completion merely changed status and did not add the replenished quantity to inventory. As a result, the order lifecycle and physical stock history could diverge.
+
+The entity also created lifecycle timestamps internally with `LocalDateTime.now()`, while stock operations already used the application `Clock`. That made time handling inconsistent and less deterministic in tests.
+
+### Decision
+
+The vague `complete` API is replaced by explicit receiving and cancellation use cases. Receiving means physical inventory arrived. It therefore increases Stock, records an IN StockMovement and transitions the replenishment order to COMPLETED in one transaction.
+
+Cancellation is permitted only for a pending order and never changes stock.
+
+Replenishment lifecycle operations lock the order row with `PESSIMISTIC_WRITE` so competing receive and cancel requests cannot both succeed against the same pending state.
+
+### Database migration
+
+Flyway migration `V4__complete_replenishment_lifecycle.sql` adds `cancelled_at`. Existing terminal rows are backfilled when necessary and a database check constraint enforces timestamp/status consistency for PENDING, COMPLETED and CANCELLED states.
+
+### API changes
+
+The old endpoint:
+
+```text
+POST /api/replenishment-orders/{id}/complete
+```
+
+is replaced by:
+
+```text
+POST /api/replenishment-orders/{id}/receive
+POST /api/replenishment-orders/{id}/cancel
+```
+
+Receiving returns the order id, generated stock movement id, received quantity, resulting balance, generated reference and receipt timestamp.
+
+The generated movement reference uses:
+
+```text
+REPLENISHMENT-{orderId}
+```
+
+### Time handling
+
+`ReplenishmentOrder` now accepts explicit lifecycle timestamps. Service use cases supply timestamps from the application `Clock`. The convenience constructor remains available for direct entity construction, while application behavior no longer depends on an uncontrolled system clock for replenishment creation, receiving or cancellation.
+
+### Policy reevaluation after receiving
+
+Normally, receiving the requested quantity reaches the target stock that existed when the order was generated. However, policy may change while the order is pending. If the resulting quantity remains below the current reorder point, the completed order is flushed and a new pending order is generated from the current policy.
+
+### Tests
+
+Entity tests cover terminal state transitions and invalid repeated transitions. Controller tests cover the receive and cancel HTTP contracts and conflict responses. Service tests verify deterministic timestamps, stock receiving and rejection before stock mutation. Testcontainers integration tests verify receiving into physical stock, the generated movement history, cancellation without balance changes and rejection of receiving a cancelled order.
+
+### Validation
+
+Run the complete Maven test suite with Docker available.
+
+```text
+mvn clean test
+```
+
+Validation result is recorded after the suite succeeds in the developer environment.
+
+### Next stage
+
+Stage 6 adds idempotency to externally initiated critical inventory operations. The goal is to make safe client retries explicit instead of treating `reference` only as descriptive metadata.

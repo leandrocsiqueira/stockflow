@@ -12,8 +12,8 @@ Version 2 improves the quality of the existing system before adding broad new sc
 | 1 | Refactor Product contracts and establish the V2 code pattern | Completed |
 | 2 | Improve Warehouse management API and contracts | Completed |
 | 3 | Move inventory policy to Product + Warehouse with reorder point and target stock | Completed |
-| 4 | Implement atomic warehouse transfers | In progress |
-| 5 | Complete replenishment lifecycle with cancellation and stock receiving | Planned |
+| 4 | Implement atomic warehouse transfers | Implemented |
+| 5 | Complete replenishment lifecycle with cancellation and stock receiving | In progress |
 | 6 | Add idempotency to critical inventory operations | Planned |
 | 7 | Improve queries for low stock, products and warehouses | Planned |
 | 8 | Strengthen exception handling, concurrency tests and integration tests | Planned |

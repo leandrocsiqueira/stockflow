@@ -16,6 +16,7 @@ public class ReplenishmentOrderMapper {
         order.getRequestedQuantity(),
         order.getStatus(),
         order.getCreatedAt(),
-        order.getCompletedAt());
+        order.getCompletedAt(),
+        order.getCancelledAt());
   }
 }

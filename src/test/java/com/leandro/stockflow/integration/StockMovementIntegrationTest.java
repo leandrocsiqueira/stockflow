@@ -395,4 +395,106 @@ class StockMovementIntegrationTest {
         .extracting(StockMovementResponse::quantity)
         .containsExactly(30, 20, 10);
   }
+
+  @Test
+  void shouldReceiveReplenishmentIntoStockAndCompleteOrder() {
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-R1"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-R1"));
+
+    String productSku = productRepository.findById(productId).orElseThrow().getSku();
+    var pending =
+        replenishmentOrderService.findPending().stream()
+            .filter(
+                order ->
+                    order.productSku().equals(productSku)
+                        && order.warehouseName().equals("Main Warehouse"))
+            .findFirst()
+            .orElseThrow();
+
+    var receipt = replenishmentOrderService.receive(pending.id());
+
+    assertThat(receipt.receivedQuantity()).isEqualTo(25);
+    assertThat(receipt.resultingBalance()).isEqualTo(30);
+    assertThat(receipt.reference()).isEqualTo("REPLENISHMENT-" + pending.id());
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(30);
+
+    ReplenishmentOrder completed = replenishmentOrderRepository.findById(pending.id()).orElseThrow();
+    assertThat(completed.getStatus().name()).isEqualTo("COMPLETED");
+    assertThat(completed.getCompletedAt()).isNotNull();
+    assertThat(completed.getCancelledAt()).isNull();
+
+    var receiptMovements =
+        stockService.findMovements(productId, warehouseId, null, null, null, PageRequest.of(0, 100))
+            .stream()
+            .filter(movement -> receipt.reference().equals(movement.reference()))
+            .toList();
+
+    assertThat(receiptMovements).hasSize(1);
+    assertThat(receiptMovements.getFirst().type()).isEqualTo(MovementType.IN);
+    assertThat(receiptMovements.getFirst().quantity()).isEqualTo(25);
+  }
+
+  @Test
+  void shouldCancelPendingReplenishmentWithoutChangingStock() {
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-C1"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-C1"));
+
+    String productSku = productRepository.findById(productId).orElseThrow().getSku();
+    var pending =
+        replenishmentOrderService.findPending().stream()
+            .filter(
+                order ->
+                    order.productSku().equals(productSku)
+                        && order.warehouseName().equals("Main Warehouse"))
+            .findFirst()
+            .orElseThrow();
+    int balanceBeforeCancellation = stockService.getBalance(productId, warehouseId).quantity();
+
+    var cancelled = replenishmentOrderService.cancel(pending.id());
+
+    assertThat(cancelled.status().name()).isEqualTo("CANCELLED");
+    assertThat(cancelled.cancelledAt()).isNotNull();
+    assertThat(cancelled.completedAt()).isNull();
+    assertThat(stockService.getBalance(productId, warehouseId).quantity())
+        .isEqualTo(balanceBeforeCancellation);
+
+    assertThat(replenishmentOrderService.findPending())
+        .noneMatch(order -> order.id().equals(pending.id()));
+  }
+
+  @Test
+  void shouldRejectReceivingCancelledReplenishmentWithoutChangingStock() {
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-C2"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-C2"));
+
+    String productSku = productRepository.findById(productId).orElseThrow().getSku();
+    var pending =
+        replenishmentOrderService.findPending().stream()
+            .filter(
+                order ->
+                    order.productSku().equals(productSku)
+                        && order.warehouseName().equals("Main Warehouse"))
+            .findFirst()
+            .orElseThrow();
+
+    replenishmentOrderService.cancel(pending.id());
+    int balanceBeforeReceiveAttempt = stockService.getBalance(productId, warehouseId).quantity();
+
+    assertThatThrownBy(() -> replenishmentOrderService.receive(pending.id()))
+        .isInstanceOf(BusinessRuleException.class)
+        .hasMessage("Only pending replenishment orders can be received");
+
+    assertThat(stockService.getBalance(productId, warehouseId).quantity())
+        .isEqualTo(balanceBeforeReceiveAttempt);
+  }
+
 }

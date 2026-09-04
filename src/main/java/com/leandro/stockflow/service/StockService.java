@@ -112,7 +112,8 @@ public class StockService {
     if (!alreadyPending) {
       int requestedQuantity = stock.replenishmentQuantity();
       ReplenishmentOrder order =
-          new ReplenishmentOrder(product, warehouse, requestedQuantity);
+          new ReplenishmentOrder(
+              product, warehouse, requestedQuantity, LocalDateTime.now(clock));
       replenishmentOrderRepository.save(order);
     }
   }
