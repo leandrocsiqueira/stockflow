@@ -25,6 +25,7 @@ import com.leandro.stockflow.service.ProductService;
 import com.leandro.stockflow.service.ReplenishmentOrderService;
 import com.leandro.stockflow.service.StockService;
 import com.leandro.stockflow.service.WarehouseService;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,9 +80,9 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldAccumulateStockAcrossMultipleInMovements() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 30, "purchase", "PO-2"));
     StockResponse balance = stockService.getBalance(productId, warehouseId);
     assertThat(balance.quantity()).isEqualTo(80);
@@ -89,9 +90,9 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldDecreaseStockOnOutMovementAndKeepBalanceConsistent() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 100, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 40, "sale", "SO-1"));
     StockResponse balance = stockService.getBalance(productId, warehouseId);
     assertThat(balance.quantity()).isEqualTo(60);
@@ -99,11 +100,11 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldRejectOutMovementExceedingAvailableBalance() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 10, "purchase", "PO-1"));
     assertThatThrownBy(
             () ->
-                stockService.registerMovement(
+                registerMovement(
                     new StockMovementRequest(
                         productId, warehouseId, MovementType.OUT, 20, "sale", "SO-1")))
         .isInstanceOf(BusinessRuleException.class)
@@ -119,11 +120,11 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldTriggerReplenishmentToTargetStockWhenBalanceDropsBelowReorderPoint() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-1"));
 
     var productSku = productRepository.findById(productId).orElseThrow().getSku();
@@ -140,15 +141,15 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldNotDuplicateReplenishmentOrderWhileOnePending() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-1"));
 
     long firstCount = replenishmentOrderService.findPending().size();
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 1, "purchase", "PO-2"));
 
     long secondCount = replenishmentOrderService.findPending().size();
@@ -160,9 +161,9 @@ class StockMovementIntegrationTest {
     WarehouseResponse secondaryWarehouse =
         warehouseService.create(new CreateWarehouseRequest("Secondary Warehouse", "MG"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(
             productId, secondaryWarehouse.id(), MovementType.IN, 10, "purchase", "PO-2"));
 
@@ -184,11 +185,11 @@ class StockMovementIntegrationTest {
     WarehouseResponse secondaryWarehouse =
         warehouseService.create(new CreateWarehouseRequest("Transfer Destination", "MG"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-T1"));
 
     StockTransferResponse transfer =
-        stockService.transfer(
+        transfer(
             new StockTransferRequest(
                 productId,
                 warehouseId,
@@ -221,13 +222,13 @@ class StockMovementIntegrationTest {
     WarehouseResponse secondaryWarehouse =
         warehouseService.create(new CreateWarehouseRequest("Rollback Destination", "PR"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 10, "purchase", "PO-T2"));
     stockService.configurePolicy(new StockPolicyRequest(productId, secondaryWarehouse.id(), 0, 0));
 
     assertThatThrownBy(
             () ->
-                stockService.transfer(
+                transfer(
                     new StockTransferRequest(
                         productId,
                         warehouseId,
@@ -250,12 +251,12 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldRejectTransferToSameWarehouseWithoutChangingStock() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 25, "purchase", "PO-T3"));
 
     assertThatThrownBy(
             () ->
-                stockService.transfer(
+                transfer(
                     new StockTransferRequest(
                         productId,
                         warehouseId,
@@ -274,11 +275,11 @@ class StockMovementIntegrationTest {
     WarehouseResponse secondaryWarehouse =
         warehouseService.create(new CreateWarehouseRequest("Replenishment Destination", "SC"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-T4"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 40, 100));
 
-    stockService.transfer(
+    transfer(
         new StockTransferRequest(
             productId,
             warehouseId,
@@ -298,11 +299,11 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldFilterMovementHistoryByTypeUsingSpecification() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 50, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 5, "sale", "SO-2"));
     var outMovements =
         stockService.findMovements(
@@ -313,11 +314,11 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldKeepBalanceConsistentWithMovementHistory() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 100, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 30, "sale", "SO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 20, "sale", "SO-2"));
     StockResponse balance = stockService.getBalance(productId, warehouseId);
     var movements =
@@ -346,9 +347,9 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldCombineMovementFiltersUsingSpecification() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 100, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 20, "sale", "SO-1"));
     var movements =
         stockService.findMovements(
@@ -361,11 +362,11 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldPaginateMovementHistory() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 10, "purchase", "PO-1"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 20, "purchase", "PO-2"));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 30, "purchase", "PO-3"));
     var page =
         stockService.findMovements(productId, warehouseId, null, null, null, PageRequest.of(0, 2));
@@ -378,13 +379,13 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldSortMovementHistoryByQuantityDescending() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 10, "purchase", "PO-1"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 30, "purchase", "PO-2"));
 
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 20, "purchase", "PO-3"));
 
     var pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "quantity"));
@@ -398,10 +399,10 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldReceiveReplenishmentIntoStockAndCompleteOrder() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-R1"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-R1"));
 
     String productSku = productRepository.findById(productId).orElseThrow().getSku();
@@ -439,10 +440,10 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldCancelPendingReplenishmentWithoutChangingStock() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-C1"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-C1"));
 
     String productSku = productRepository.findById(productId).orElseThrow().getSku();
@@ -470,10 +471,10 @@ class StockMovementIntegrationTest {
 
   @Test
   void shouldRejectReceivingCancelledReplenishmentWithoutChangingStock() {
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-C2"));
     stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
-    stockService.registerMovement(
+    registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-C2"));
 
     String productSku = productRepository.findById(productId).orElseThrow().getSku();
@@ -495,6 +496,83 @@ class StockMovementIntegrationTest {
 
     assertThat(stockService.getBalance(productId, warehouseId).quantity())
         .isEqualTo(balanceBeforeReceiveAttempt);
+  }
+
+  @Test
+  void shouldReplayStockMovementWithoutChangingBalanceTwice() {
+    StockMovementRequest request =
+        new StockMovementRequest(
+            productId, warehouseId, MovementType.IN, 25, "purchase", "PO-IDEMP-1");
+
+    StockMovementResponse first =
+        stockService.registerMovement(request, "movement-idempotency-001");
+    StockMovementResponse replay =
+        stockService.registerMovement(request, "movement-idempotency-001");
+
+    assertThat(replay).isEqualTo(first);
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(25);
+
+    var movements =
+        stockService.findMovements(
+            productId, warehouseId, null, null, null, PageRequest.of(0, 100));
+    assertThat(movements.getContent())
+        .filteredOn(movement -> "PO-IDEMP-1".equals(movement.reference()))
+        .hasSize(1);
+  }
+
+  @Test
+  void shouldReplayTransferWithoutMovingStockTwice() {
+    WarehouseResponse destination =
+        warehouseService.create(new CreateWarehouseRequest("Idempotent Destination", "RJ"));
+    registerMovement(
+        new StockMovementRequest(
+            productId, warehouseId, MovementType.IN, 50, "purchase", "PO-IDEMP-2"));
+
+    StockTransferRequest request =
+        new StockTransferRequest(
+            productId, warehouseId, destination.id(), 20, "Internal transfer", "TRF-IDEMP-1");
+
+    StockTransferResponse first = stockService.transfer(request, "transfer-idempotency-001");
+    StockTransferResponse replay = stockService.transfer(request, "transfer-idempotency-001");
+
+    assertThat(replay).isEqualTo(first);
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(30);
+    assertThat(stockService.getBalance(productId, destination.id()).quantity()).isEqualTo(20);
+
+    var movements =
+        stockService.findMovements(productId, null, null, null, null, PageRequest.of(0, 100));
+    assertThat(movements.getContent())
+        .filteredOn(movement -> "TRF-IDEMP-1".equals(movement.reference()))
+        .hasSize(2);
+  }
+
+  @Test
+  void shouldRejectReusingIdempotencyKeyWithDifferentPayload() {
+    StockMovementRequest firstRequest =
+        new StockMovementRequest(
+            productId, warehouseId, MovementType.IN, 10, "purchase", "PO-IDEMP-3");
+    StockMovementRequest changedRequest =
+        new StockMovementRequest(
+            productId, warehouseId, MovementType.IN, 20, "purchase", "PO-IDEMP-3");
+
+    stockService.registerMovement(firstRequest, "movement-idempotency-conflict");
+
+    assertThatThrownBy(
+            () ->
+                stockService.registerMovement(
+                    changedRequest, "movement-idempotency-conflict"))
+        .isInstanceOf(BusinessRuleException.class)
+        .hasMessage("Idempotency-Key has already been used with a different request");
+
+    assertThat(stockService.getBalance(productId, warehouseId).quantity()).isEqualTo(10);
+  }
+
+  private StockMovementResponse registerMovement(StockMovementRequest request) {
+    return stockService.registerMovement(request, "test-movement-" + UUID.randomUUID());
+  }
+
+  private StockTransferResponse transfer(StockTransferRequest request) {
+    return stockService.transfer(request, "test-transfer-" + UUID.randomUUID());
   }
 
 }

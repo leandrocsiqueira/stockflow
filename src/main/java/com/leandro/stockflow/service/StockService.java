@@ -6,6 +6,7 @@ import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
 import com.leandro.stockflow.dto.StockTransferRequest;
 import com.leandro.stockflow.dto.StockTransferResponse;
+import com.leandro.stockflow.entity.InventoryOperationType;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.entity.Product;
 import com.leandro.stockflow.entity.ReplenishmentOrder;
@@ -39,6 +40,7 @@ public class StockService {
   private final ProductRepository productRepository;
   private final WarehouseRepository warehouseRepository;
   private final ReplenishmentOrderRepository replenishmentOrderRepository;
+  private final IdempotencyService idempotencyService;
   private final Clock clock;
 
   public StockService(
@@ -47,17 +49,29 @@ public class StockService {
       ProductRepository productRepository,
       WarehouseRepository warehouseRepository,
       ReplenishmentOrderRepository replenishmentOrderRepository,
+      IdempotencyService idempotencyService,
       Clock clock) {
     this.stockRepository = stockRepository;
     this.movementRepository = movementRepository;
     this.productRepository = productRepository;
     this.warehouseRepository = warehouseRepository;
     this.replenishmentOrderRepository = replenishmentOrderRepository;
+    this.idempotencyService = idempotencyService;
     this.clock = clock;
   }
 
   @Transactional
-  public StockMovementResponse registerMovement(StockMovementRequest request) {
+  public StockMovementResponse registerMovement(
+      StockMovementRequest request, String idempotencyKey) {
+    return idempotencyService.execute(
+        idempotencyKey,
+        InventoryOperationType.MOVEMENT,
+        RequestFingerprint.forMovement(request),
+        StockMovementResponse.class,
+        () -> doRegisterMovement(request));
+  }
+
+  private StockMovementResponse doRegisterMovement(StockMovementRequest request) {
     Product product =
         productRepository
             .findById(request.productId())
@@ -119,7 +133,16 @@ public class StockService {
   }
 
   @Transactional
-  public StockTransferResponse transfer(StockTransferRequest request) {
+  public StockTransferResponse transfer(StockTransferRequest request, String idempotencyKey) {
+    return idempotencyService.execute(
+        idempotencyKey,
+        InventoryOperationType.TRANSFER,
+        RequestFingerprint.forTransfer(request),
+        StockTransferResponse.class,
+        () -> doTransfer(request));
+  }
+
+  private StockTransferResponse doTransfer(StockTransferRequest request) {
     if (request.sourceWarehouseId().equals(request.destinationWarehouseId())) {
       throw new BusinessRuleException("Source and destination warehouses must be different");
     }

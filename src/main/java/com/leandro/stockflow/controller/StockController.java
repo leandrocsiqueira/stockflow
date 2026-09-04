@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,7 +50,9 @@ public class StockController {
   }
 
   @PostMapping("/movements")
-  @Operation(summary = "Register a stock movement")
+  @Operation(
+      summary = "Register a stock movement",
+      description = "Requires Idempotency-Key so client retries do not apply the movement twice")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Stock movement registered successfully"),
     @ApiResponse(
@@ -66,15 +69,17 @@ public class StockController {
         content = @Content(schema = @Schema(implementation = ApiError.class)))
   })
   public ResponseEntity<StockMovementResponse> registerMovement(
+      @RequestHeader("Idempotency-Key") String idempotencyKey,
       @Valid @RequestBody StockMovementRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(stockService.registerMovement(request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(stockService.registerMovement(request, idempotencyKey));
   }
 
   @PostMapping("/transfers")
   @Operation(
       summary = "Transfer stock between warehouses",
       description =
-          "Moves one product between two warehouses atomically and records both movement sides")
+          "Moves one product between two warehouses atomically. Requires Idempotency-Key for safe retries")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Stock transfer completed successfully"),
     @ApiResponse(
@@ -91,8 +96,10 @@ public class StockController {
         content = @Content(schema = @Schema(implementation = ApiError.class)))
   })
   public ResponseEntity<StockTransferResponse> transfer(
+      @RequestHeader("Idempotency-Key") String idempotencyKey,
       @Valid @RequestBody StockTransferRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(stockService.transfer(request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(stockService.transfer(request, idempotencyKey));
   }
 
   @GetMapping("/movements")

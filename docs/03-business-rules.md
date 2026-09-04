@@ -71,6 +71,15 @@ A second receive attempt against the same order is rejected before another stock
 
 If the inventory policy changed while the order was pending and the received quantity still leaves stock below the current reorder point, the completed order is flushed and a new pending replenishment is created for the remaining amount required to reach the new target stock.
 
+
+## Idempotent client retries
+
+Manual stock movements and warehouse transfers require an `Idempotency-Key` header. The key identifies one logical API command and is separate from the movement `reference`.
+
+The same key with the same operation type and request payload returns the previously stored successful response without changing stock again. The same key with a different payload or operation type is rejected.
+
+The idempotency reservation is created inside the same transaction as the inventory mutation. A failed inventory transaction therefore does not permanently consume the key. PostgreSQL uniqueness and `ON CONFLICT DO NOTHING` coordinate simultaneous retries so only one request performs the side effect.
+
 ## Transaction boundaries
 
 Stock movement, warehouse transfer and replenishment receiving are transactional write use cases. The database transaction is part of the business guarantee rather than only an implementation detail.

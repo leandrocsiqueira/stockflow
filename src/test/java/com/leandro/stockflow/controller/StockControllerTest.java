@@ -1,6 +1,7 @@
 package com.leandro.stockflow.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -49,11 +50,13 @@ class StockControllerTest {
             "REF-001",
             LocalDateTime.of(2026, 8, 31, 10, 0));
 
-    when(stockService.registerMovement(any(StockMovementRequest.class))).thenReturn(response);
+    when(stockService.registerMovement(any(StockMovementRequest.class), eq("movement-key-001")))
+        .thenReturn(response);
 
     mockMvc
         .perform(
             post("/api/stock/movements")
+                .header("Idempotency-Key", "movement-key-001")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -91,11 +94,13 @@ class StockControllerTest {
             20,
             LocalDateTime.of(2026, 9, 4, 10, 0));
 
-    when(stockService.transfer(any(StockTransferRequest.class))).thenReturn(response);
+    when(stockService.transfer(any(StockTransferRequest.class), eq("transfer-key-001")))
+        .thenReturn(response);
 
     mockMvc
         .perform(
             post("/api/stock/transfers")
+                .header("Idempotency-Key", "transfer-key-001")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -125,6 +130,7 @@ class StockControllerTest {
     mockMvc
         .perform(
             post("/api/stock/transfers")
+                .header("Idempotency-Key", "transfer-key-validation")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -139,6 +145,25 @@ class StockControllerTest {
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.message").value("Validation failed"))
         .andExpect(jsonPath("$.details[0].field").value("reference"));
+  }
+
+
+  @Test
+  void shouldRequireIdempotencyKeyForStockMovement() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/stock/movements")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "productId": 1,
+                      "warehouseId": 1,
+                      "type": "IN",
+                      "quantity": 10
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

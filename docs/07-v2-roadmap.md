@@ -13,8 +13,8 @@ Version 2 improves the quality of the existing system before adding broad new sc
 | 2 | Improve Warehouse management API and contracts | Completed |
 | 3 | Move inventory policy to Product + Warehouse with reorder point and target stock | Completed |
 | 4 | Implement atomic warehouse transfers | Implemented |
-| 5 | Complete replenishment lifecycle with cancellation and stock receiving | In progress |
-| 6 | Add idempotency to critical inventory operations | Planned |
+| 5 | Complete replenishment lifecycle with cancellation and stock receiving | Implemented |
+| 6 | Add idempotency to critical inventory operations | Implemented |
 | 7 | Improve queries for low stock, products and warehouses | Planned |
 | 8 | Strengthen exception handling, concurrency tests and integration tests | Planned |
 | 9 | Add Actuator, CI and code-quality checks | Planned |
@@ -59,9 +59,9 @@ The operation is all-or-nothing and provides a practical place to document trans
 
 ## Idempotency
 
-Critical write operations will be evaluated for idempotency. A network retry must not accidentally apply the same inventory movement twice.
+Manual stock movements and warehouse transfers require an `Idempotency-Key` header. A network retry with the same key and same request replays the original successful response without applying the inventory side effect again.
 
-The existing movement `reference` field is not currently sufficient because uniqueness and request replay semantics are not enforced.
+The existing movement `reference` remains business metadata. Idempotency keys are persisted separately in `inventory_operations`, together with the operation type, request fingerprint and serialized response.
 
 ## Explicit non-goals for V2
 
