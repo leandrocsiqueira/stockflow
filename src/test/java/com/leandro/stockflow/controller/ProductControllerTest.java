@@ -30,7 +30,7 @@ class ProductControllerTest {
 
   @Test
   void shouldCreateProduct() throws Exception {
-    ProductResponse response = new ProductResponse(1L, "SKU-001", "Keyboard", "UN", 5);
+    ProductResponse response = new ProductResponse(1L, "SKU-001", "Keyboard", "UN");
 
     when(productService.create(any(CreateProductRequest.class))).thenReturn(response);
 
@@ -43,8 +43,7 @@ class ProductControllerTest {
                     {
                       "sku": "SKU-001",
                       "name": "Keyboard",
-                      "unit": "UN",
-                      "minimumStock": 5
+                      "unit": "UN"
                     }
                     """))
         .andExpect(status().isCreated())
@@ -55,7 +54,7 @@ class ProductControllerTest {
 
   @Test
   void shouldUpdateProductMutableFields() throws Exception {
-    ProductResponse response = new ProductResponse(1L, "SKU-001", "Mechanical Keyboard", "UN", 10);
+    ProductResponse response = new ProductResponse(1L, "SKU-001", "Mechanical Keyboard", "UN");
 
     when(productService.update(eq(1L), any(UpdateProductRequest.class))).thenReturn(response);
 
@@ -66,16 +65,14 @@ class ProductControllerTest {
                 .content(
                     """
                     {
-                      "name": "Mechanical Keyboard",
-                      "minimumStock": 10
+                      "name": "Mechanical Keyboard"
                     }
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(1))
         .andExpect(jsonPath("$.sku").value("SKU-001"))
         .andExpect(jsonPath("$.unit").value("UN"))
-        .andExpect(jsonPath("$.name").value("Mechanical Keyboard"))
-        .andExpect(jsonPath("$.minimumStock").value(10));
+        .andExpect(jsonPath("$.name").value("Mechanical Keyboard"));
   }
 
   @Test
@@ -87,8 +84,7 @@ class ProductControllerTest {
                 .content(
                     """
                     {
-                      "name": "",
-                      "minimumStock": -1
+                      "name": ""
                     }
                     """))
         .andExpect(status().isBadRequest())
@@ -100,7 +96,7 @@ class ProductControllerTest {
 
   @Test
   void shouldReturnProductById() throws Exception {
-    ProductResponse response = new ProductResponse(1L, "SKU-001", "Keyboard", "UN", 5);
+    ProductResponse response = new ProductResponse(1L, "SKU-001", "Keyboard", "UN");
 
     when(productService.findById(1L)).thenReturn(response);
 
@@ -136,8 +132,7 @@ class ProductControllerTest {
                     {
                       "sku": "",
                       "name": "",
-                      "unit": "",
-                      "minimumStock": -1
+                      "unit": ""
                     }
                     """))
         .andExpect(status().isBadRequest())
@@ -159,8 +154,7 @@ class ProductControllerTest {
                     {
                       "sku": "SKU-001",
                       "name": "Keyboard",
-                      "unit": "UN",
-                      "minimumStock": {}
+                      "unit": {}
                     }
                     """))
         .andExpect(status().isBadRequest())

@@ -7,13 +7,59 @@ import com.leandro.stockflow.exception.BusinessRuleException;
 import org.junit.jupiter.api.Test;
 
 class StockTest {
-  private final Product product = new Product("SKU-001", "Keyboard", "UNIT", 10);
+  private final Product product = new Product("SKU-001", "Keyboard", "UNIT");
   private final Warehouse warehouse = new Warehouse("Main Warehouse", "Building A");
 
   @Test
-  void shouldStartWithZeroQuantity() {
+  void shouldStartWithZeroQuantityAndDisabledReplenishmentPolicy() {
     Stock stock = new Stock(product, warehouse);
+
     assertThat(stock.getQuantity()).isZero();
+    assertThat(stock.getReorderPoint()).isZero();
+    assertThat(stock.getTargetStock()).isZero();
+    assertThat(stock.isBelowReorderPoint()).isFalse();
+  }
+
+  @Test
+  void shouldConfigureInventoryPolicy() {
+    Stock stock = new Stock(product, warehouse);
+
+    stock.configurePolicy(10, 30);
+
+    assertThat(stock.getReorderPoint()).isEqualTo(10);
+    assertThat(stock.getTargetStock()).isEqualTo(30);
+    assertThat(stock.isBelowReorderPoint()).isTrue();
+    assertThat(stock.replenishmentQuantity()).isEqualTo(30);
+  }
+
+  @Test
+  void shouldCalculateReplenishmentQuantityUsingTargetStock() {
+    Stock stock = new Stock(product, warehouse);
+    stock.configurePolicy(10, 30);
+    stock.increase(15);
+    stock.decrease(6);
+
+    assertThat(stock.getQuantity()).isEqualTo(9);
+    assertThat(stock.isBelowReorderPoint()).isTrue();
+    assertThat(stock.replenishmentQuantity()).isEqualTo(21);
+  }
+
+  @Test
+  void shouldRejectNegativeReorderPoint() {
+    Stock stock = new Stock(product, warehouse);
+
+    assertThatThrownBy(() -> stock.configurePolicy(-1, 10))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Reorder point cannot be negative");
+  }
+
+  @Test
+  void shouldRejectTargetStockBelowReorderPoint() {
+    Stock stock = new Stock(product, warehouse);
+
+    assertThatThrownBy(() -> stock.configurePolicy(10, 9))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Target stock must be greater than or equal to reorder point");
   }
 
   @Test

@@ -2,6 +2,7 @@ package com.leandro.stockflow.service;
 
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
+import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.entity.Product;
@@ -91,7 +92,7 @@ public class StockService {
             LocalDateTime.now(clock));
     movementRepository.save(movement);
 
-    if (stock.isBelowMinimum()) {
+    if (stock.isBelowReorderPoint()) {
       triggerReplenishmentIfNeeded(product, warehouse, stock);
     }
 
@@ -106,10 +107,41 @@ public class StockService {
             .isPresent();
 
     if (!alreadyPending) {
-      int deficit = product.getMinimumStock() - stock.getQuantity();
-      ReplenishmentOrder order = new ReplenishmentOrder(product, warehouse, deficit);
+      int requestedQuantity = stock.replenishmentQuantity();
+      ReplenishmentOrder order =
+          new ReplenishmentOrder(product, warehouse, requestedQuantity);
       replenishmentOrderRepository.save(order);
     }
+  }
+
+  @Transactional
+  public StockResponse configurePolicy(StockPolicyRequest request) {
+    Product product =
+        productRepository
+            .findById(request.productId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Product not found with id: " + request.productId()));
+
+    Warehouse warehouse =
+        warehouseRepository
+            .findById(request.warehouseId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Warehouse not found with id: " + request.warehouseId()));
+
+    Stock stock =
+        stockRepository
+            .findForUpdate(product.getId(), warehouse.getId())
+            .orElseGet(() -> stockRepository.save(new Stock(product, warehouse)));
+
+    stock.configurePolicy(request.reorderPoint(), request.targetStock());
+    if (stock.isBelowReorderPoint()) {
+      triggerReplenishmentIfNeeded(product, warehouse, stock);
+    }
+    return StockMapper.toResponse(stock);
   }
 
   @Transactional(readOnly = true)

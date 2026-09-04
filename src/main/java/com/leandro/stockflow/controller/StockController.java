@@ -3,6 +3,7 @@ package com.leandro.stockflow.controller;
 import com.leandro.stockflow.dto.PageResponse;
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
+import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.exception.ApiError;
@@ -26,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -81,6 +83,27 @@ public class StockController {
     return ResponseEntity.ok(
         PageResponse.from(
             stockService.findMovements(productId, warehouseId, type, from, to, pageable)));
+  }
+
+  @PutMapping("/policies")
+  @Operation(
+      summary = "Configure inventory policy",
+      description =
+          "Configures reorder point and target stock for one product in one warehouse")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Inventory policy configured successfully"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Invalid policy",
+        content = @Content(schema = @Schema(implementation = ApiError.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "Product or warehouse not found",
+        content = @Content(schema = @Schema(implementation = ApiError.class)))
+  })
+  public ResponseEntity<StockResponse> configurePolicy(
+      @Valid @RequestBody StockPolicyRequest request) {
+    return ResponseEntity.ok(stockService.configurePolicy(request));
   }
 
   @GetMapping("/balance")

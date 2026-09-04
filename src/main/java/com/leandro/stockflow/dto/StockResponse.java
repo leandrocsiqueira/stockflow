@@ -6,5 +6,6 @@ public record StockResponse(
     String productName,
     String warehouseName,
     int quantity,
-    int minimumStock,
-    boolean belowMinimum) {}
+    int reorderPoint,
+    int targetStock,
+    boolean belowReorderPoint) {}

@@ -31,7 +31,7 @@ public class ProductService {
                   "A product with SKU " + request.sku() + " already exists");
             });
     Product product =
-        new Product(request.sku(), request.name(), request.unit(), request.minimumStock());
+        new Product(request.sku(), request.name(), request.unit());
     return ProductMapper.toResponse(productRepository.save(product));
   }
 
@@ -49,7 +49,6 @@ public class ProductService {
   public ProductResponse update(Long id, UpdateProductRequest request) {
     Product product = getOrThrow(id);
     product.setName(request.name());
-    product.setMinimumStock(request.minimumStock());
     return ProductMapper.toResponse(product);
   }
 

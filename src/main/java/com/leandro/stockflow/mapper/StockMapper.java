@@ -14,7 +14,8 @@ public class StockMapper {
         stock.getProduct().getName(),
         stock.getWarehouse().getName(),
         stock.getQuantity(),
-        stock.getProduct().getMinimumStock(),
-        stock.isBelowMinimum());
+        stock.getReorderPoint(),
+        stock.getTargetStock(),
+        stock.isBelowReorderPoint());
   }
 }

@@ -7,6 +7,7 @@ import com.leandro.stockflow.dto.CreateProductRequest;
 import com.leandro.stockflow.dto.ProductResponse;
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
+import com.leandro.stockflow.dto.StockPolicyRequest;
 import com.leandro.stockflow.dto.StockResponse;
 import com.leandro.stockflow.dto.CreateWarehouseRequest;
 import com.leandro.stockflow.dto.WarehouseResponse;
@@ -67,7 +68,7 @@ class StockMovementIntegrationTest {
   void setUp() {
     ProductResponse product =
         productService.create(
-            new CreateProductRequest("SKU-" + System.nanoTime(), "Test Widget", "unit", 10));
+            new CreateProductRequest("SKU-" + System.nanoTime(), "Test Widget", "unit"));
     WarehouseResponse warehouse =
         warehouseService.create(new CreateWarehouseRequest("Main Warehouse", "SP"));
     productId = product.id();
@@ -115,31 +116,65 @@ class StockMovementIntegrationTest {
   }
 
   @Test
-  void shouldTriggerReplenishmentOrderWhenStockDropsBelowMinimum() {
-    // product minimum stock is 10
+  void shouldTriggerReplenishmentToTargetStockWhenBalanceDropsBelowReorderPoint() {
     stockService.registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+
     stockService.registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-1"));
+
+    var productSku = productRepository.findById(productId).orElseThrow().getSku();
     var pending = replenishmentOrderService.findPending();
+
     assertThat(pending)
         .anyMatch(
             order ->
-                order
-                        .productSku()
-                        .equals(productRepository.findById(productId).orElseThrow().getSku())
+                order.productSku().equals(productSku)
+                    && order.warehouseName().equals("Main Warehouse")
+                    && order.requestedQuantity() == 25
                     && order.status().name().equals("PENDING"));
   }
 
   @Test
   void shouldNotDuplicateReplenishmentOrderWhileOnePending() {
     stockService.registerMovement(
-        new StockMovementRequest(productId, warehouseId, MovementType.IN, 5, "purchase", "PO-1"));
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.OUT, 10, "sale", "SO-1"));
+
     long firstCount = replenishmentOrderService.findPending().size();
+
     stockService.registerMovement(
         new StockMovementRequest(productId, warehouseId, MovementType.IN, 1, "purchase", "PO-2"));
+
     long secondCount = replenishmentOrderService.findPending().size();
     assertThat(secondCount).isEqualTo(firstCount);
+  }
+
+  @Test
+  void shouldKeepInventoryPolicySpecificToEachWarehouse() {
+    WarehouseResponse secondaryWarehouse =
+        warehouseService.create(new CreateWarehouseRequest("Secondary Warehouse", "MG"));
+
+    stockService.registerMovement(
+        new StockMovementRequest(productId, warehouseId, MovementType.IN, 15, "purchase", "PO-1"));
+    stockService.registerMovement(
+        new StockMovementRequest(
+            productId, secondaryWarehouse.id(), MovementType.IN, 10, "purchase", "PO-2"));
+
+    stockService.configurePolicy(new StockPolicyRequest(productId, warehouseId, 10, 30));
+    stockService.configurePolicy(new StockPolicyRequest(productId, secondaryWarehouse.id(), 5, 12));
+
+    StockResponse mainBalance = stockService.getBalance(productId, warehouseId);
+    StockResponse secondaryBalance =
+        stockService.getBalance(productId, secondaryWarehouse.id());
+
+    assertThat(mainBalance.reorderPoint()).isEqualTo(10);
+    assertThat(mainBalance.targetStock()).isEqualTo(30);
+    assertThat(secondaryBalance.reorderPoint()).isEqualTo(5);
+    assertThat(secondaryBalance.targetStock()).isEqualTo(12);
   }
 
   @Test

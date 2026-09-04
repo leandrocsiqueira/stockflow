@@ -5,11 +5,14 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
+import com.leandro.stockflow.dto.StockPolicyRequest;
+import com.leandro.stockflow.dto.StockResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.service.StockService;
 import java.time.LocalDateTime;
@@ -67,6 +70,52 @@ class StockControllerTest {
         .andExpect(jsonPath("$.warehouseName").value("Main Warehouse"))
         .andExpect(jsonPath("$.type").value("IN"))
         .andExpect(jsonPath("$.quantity").value(10));
+  }
+
+  @Test
+  void shouldConfigureInventoryPolicy() throws Exception {
+    StockResponse response =
+        new StockResponse(1L, "SKU-001", "Keyboard", "Main Warehouse", 15, 10, 30, false);
+
+    when(stockService.configurePolicy(any(StockPolicyRequest.class))).thenReturn(response);
+
+    mockMvc
+        .perform(
+            put("/api/stock/policies")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "productId": 1,
+                      "warehouseId": 1,
+                      "reorderPoint": 10,
+                      "targetStock": 30
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reorderPoint").value(10))
+        .andExpect(jsonPath("$.targetStock").value(30))
+        .andExpect(jsonPath("$.belowReorderPoint").value(false));
+  }
+
+  @Test
+  void shouldRejectInventoryPolicyWhenTargetIsBelowReorderPoint() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/stock/policies")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "productId": 1,
+                      "warehouseId": 1,
+                      "reorderPoint": 10,
+                      "targetStock": 9
+                    }
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value("Validation failed"));
   }
 
   @Test

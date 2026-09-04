@@ -33,6 +33,12 @@ public class Stock {
   @Column(nullable = false)
   private int quantity;
 
+  @Column(name = "reorder_point", nullable = false)
+  private int reorderPoint;
+
+  @Column(name = "target_stock", nullable = false)
+  private int targetStock;
+
   @Version private long version;
 
   protected Stock() {}
@@ -47,6 +53,20 @@ public class Stock {
     this.product = product;
     this.warehouse = warehouse;
     this.quantity = 0;
+    this.reorderPoint = 0;
+    this.targetStock = 0;
+  }
+
+  public void configurePolicy(int reorderPoint, int targetStock) {
+    if (reorderPoint < 0) {
+      throw new IllegalArgumentException("Reorder point cannot be negative");
+    }
+    if (targetStock < reorderPoint) {
+      throw new IllegalArgumentException(
+          "Target stock must be greater than or equal to reorder point");
+    }
+    this.reorderPoint = reorderPoint;
+    this.targetStock = targetStock;
   }
 
   public void increase(int amount) {
@@ -64,8 +84,15 @@ public class Stock {
     this.quantity -= amount;
   }
 
-  public boolean isBelowMinimum() {
-    return quantity < product.getMinimumStock();
+  public boolean isBelowReorderPoint() {
+    return quantity < reorderPoint;
+  }
+
+  public int replenishmentQuantity() {
+    if (!isBelowReorderPoint()) {
+      return 0;
+    }
+    return targetStock - quantity;
   }
 
   public Long getId() {
@@ -82,6 +109,14 @@ public class Stock {
 
   public int getQuantity() {
     return quantity;
+  }
+
+  public int getReorderPoint() {
+    return reorderPoint;
+  }
+
+  public int getTargetStock() {
+    return targetStock;
   }
 
   public long getVersion() {

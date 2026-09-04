@@ -25,19 +25,15 @@ public class Product {
   @Column(nullable = false)
   private String unit;
 
-  @Column(name = "minimum_stock", nullable = false)
-  private int minimumStock;
-
   @Column(name = "created_at", nullable = false)
   private LocalDateTime createdAt;
 
   protected Product() {}
 
-  public Product(String sku, String name, String unit, int minimumStock) {
+  public Product(String sku, String name, String unit) {
     this.sku = validateSku(sku);
     setName(name);
     this.unit = validateUnit(unit);
-    setMinimumStock(minimumStock);
     this.createdAt = LocalDateTime.now();
   }
 
@@ -62,17 +58,6 @@ public class Product {
 
   public String getUnit() {
     return unit;
-  }
-
-  public int getMinimumStock() {
-    return minimumStock;
-  }
-
-  public void setMinimumStock(int minimumStock) {
-    if (minimumStock < 0) {
-      throw new IllegalArgumentException("Minimum stock cannot be negative");
-    }
-    this.minimumStock = minimumStock;
   }
 
   public LocalDateTime getCreatedAt() {

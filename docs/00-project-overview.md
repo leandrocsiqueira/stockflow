@@ -12,13 +12,13 @@ The backend is implemented with Java 25 and Spring Boot 3.5.16. PostgreSQL is us
 |---|---|
 | Product | Represents an inventory item identified by SKU, name and unit |
 | Warehouse | Represents a physical or logical storage location |
-| Stock | Stores the current quantity for one product in one warehouse |
+| Stock | Stores quantity and replenishment policy for one product in one warehouse |
 | StockMovement | Records an immutable IN or OUT operation |
 | ReplenishmentOrder | Represents an automatically generated replenishment request |
 
 ## Main business flow
 
-A stock movement is submitted through the HTTP API. The application loads the product and warehouse, obtains or creates the corresponding stock record, changes the quantity, persists an immutable movement record and evaluates whether replenishment is required.
+A stock movement is submitted through the HTTP API. The application loads the product and warehouse, obtains or creates the corresponding stock record, changes the quantity, persists an immutable movement record and evaluates the inventory policy for that product and warehouse.
 
 ```text
 HTTP request
@@ -39,22 +39,28 @@ StockService.registerMovement()
     |
     +--> StockMovementRepository
     |
-    +--> minimum stock evaluation
+    +--> reorder point evaluation
+            |
+            +--> target stock calculation
             |
             +--> ReplenishmentOrderRepository
 ```
 
-## Business rules already implemented in V1
+## Current business rules
 
 | Rule | Current behavior |
 |---|---|
 | Product SKU | Must be unique |
-| Product minimum stock | Cannot be negative |
+| Product catalog | SKU and unit are immutable after creation |
 | Stock quantity | Cannot become negative |
+| Inventory policy | Defined independently for each product and warehouse |
+| Reorder point | Cannot be negative |
+| Target stock | Must be greater than or equal to the reorder point |
 | Stock movement quantity | Must be positive |
 | Movement history | Every IN or OUT operation creates a record |
 | Stock scope | Quantity is maintained per product and warehouse |
-| Replenishment | Automatically created when stock falls below product minimum |
+| Replenishment | Created when quantity falls below the location-specific reorder point |
+| Replenishment quantity | Requests enough units to reach target stock |
 | Duplicate replenishment | Only one pending order is allowed per product and warehouse |
 | Movement search | Supports product, warehouse, type and date filters |
 | Pagination | Available for stock movement history |

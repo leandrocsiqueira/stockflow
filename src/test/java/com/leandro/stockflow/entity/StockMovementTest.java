@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class StockMovementTest {
 
-  private final Product product = new Product("SKU-001", "Keyboard", "UNIT", 10);
+  private final Product product = new Product("SKU-001", "Keyboard", "UNIT");
   private final Warehouse warehouse = new Warehouse("Main Warehouse", "Building A");
 
   @Test

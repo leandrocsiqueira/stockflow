@@ -29,8 +29,7 @@ class ProductServiceTest {
 
   @Test
   void shouldCreateProduct() {
-    CreateProductRequest request =
-        new CreateProductRequest("SKU-001", "Keyboard", "UN", 5);
+    CreateProductRequest request = new CreateProductRequest("SKU-001", "Keyboard", "UN");
 
     when(productRepository.findBySku("SKU-001")).thenReturn(Optional.empty());
     when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -40,15 +39,13 @@ class ProductServiceTest {
     assertThat(response.sku()).isEqualTo("SKU-001");
     assertThat(response.name()).isEqualTo("Keyboard");
     assertThat(response.unit()).isEqualTo("UN");
-    assertThat(response.minimumStock()).isEqualTo(5);
     verify(productRepository).save(any(Product.class));
   }
 
   @Test
   void shouldRejectDuplicateSku() {
-    CreateProductRequest request =
-        new CreateProductRequest("SKU-001", "Keyboard", "UN", 5);
-    Product existing = new Product("SKU-001", "Existing product", "UN", 1);
+    CreateProductRequest request = new CreateProductRequest("SKU-001", "Keyboard", "UN");
+    Product existing = new Product("SKU-001", "Existing product", "UN");
 
     when(productRepository.findBySku("SKU-001")).thenReturn(Optional.of(existing));
 
@@ -59,8 +56,8 @@ class ProductServiceTest {
 
   @Test
   void shouldUpdateOnlyMutableFields() {
-    Product product = new Product("SKU-001", "Keyboard", "UN", 5);
-    UpdateProductRequest request = new UpdateProductRequest("Mechanical Keyboard", 10);
+    Product product = new Product("SKU-001", "Keyboard", "UN");
+    UpdateProductRequest request = new UpdateProductRequest("Mechanical Keyboard");
 
     when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
@@ -69,14 +66,13 @@ class ProductServiceTest {
     assertThat(response.sku()).isEqualTo("SKU-001");
     assertThat(response.unit()).isEqualTo("UN");
     assertThat(response.name()).isEqualTo("Mechanical Keyboard");
-    assertThat(response.minimumStock()).isEqualTo(10);
   }
 
   @Test
   void shouldThrowWhenUpdatingMissingProduct() {
     when(productRepository.findById(999L)).thenReturn(Optional.empty());
 
-    UpdateProductRequest request = new UpdateProductRequest("Keyboard", 5);
+    UpdateProductRequest request = new UpdateProductRequest("Keyboard");
 
     assertThatThrownBy(() -> productService.update(999L, request))
         .isInstanceOf(ResourceNotFoundException.class)

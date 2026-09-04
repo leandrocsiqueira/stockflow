@@ -168,7 +168,81 @@ Run the complete Maven test suite with Docker available.
 mvn clean test
 ```
 
+### Validation result
+
+Stage 2 was validated successfully in the developer environment.
+
+```text
+Tests run: 65, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
 ### Next stage
 
-After this stage is green and committed, the project moves into its first substantial domain migration: inventory policy will stop being globally attached to `Product` and will become specific to each product and warehouse combination.
+The project now moves into its first substantial domain migration: inventory policy stops being globally attached to `Product` and becomes specific to each product and warehouse combination.
 
+## Stage 3 - Per-warehouse inventory policy
+
+### Problem
+
+V1 stored `minimumStock` on `Product`. Stock quantity, however, already belonged to a Product + Warehouse pair. This forced every warehouse to use the same replenishment threshold for a product and made the catalog entity responsible for an operational inventory rule.
+
+### Decision
+
+Inventory policy moves to `Stock`, the entity that represents one product in one warehouse. `Product` now contains only catalog information. Each stock record owns `reorderPoint` and `targetStock`.
+
+`reorderPoint` determines when replenishment starts. `targetStock` determines the desired quantity after replenishment and must be greater than or equal to the reorder point. A zero/zero policy means automatic replenishment is disabled for that location.
+
+### Database migration
+
+Flyway migration `V3__move_inventory_policy_to_stock.sql` adds `reorder_point` and `target_stock` to `stock`. Existing stock rows inherit the old product minimum for both values, preserving V1 replenishment behavior for data that already has a stock record. The obsolete `products.minimum_stock` column is then removed.
+
+### API changes
+
+Product creation no longer accepts `minimumStock` and product update now changes only `name`. Inventory policy is configured explicitly with:
+
+```text
+PUT /api/stock/policies
+```
+
+Example:
+
+```json
+{
+  "productId": 1,
+  "warehouseId": 1,
+  "reorderPoint": 10,
+  "targetStock": 30
+}
+```
+
+The stock response now exposes quantity, reorder point, target stock and whether the current balance is below the reorder point.
+
+### Replenishment calculation
+
+V1 requested only enough units to return to the global minimum. V2 requests enough units to reach target stock.
+
+```text
+quantity = 5
+reorderPoint = 10
+targetStock = 30
+requestedQuantity = 25
+```
+
+This policy is evaluated independently for each warehouse.
+
+### Tests
+
+Entity tests cover policy validation and target-stock calculation. Controller tests cover the new policy endpoint and cross-field validation. The Testcontainers integration suite verifies that different warehouses can use different policies and that replenishment requests the quantity required to reach target stock.
+
+### Validation
+
+Run the complete Maven test suite with Docker available.
+
+```text
+mvn clean test
+```
+
+### Next stage
+
+After this migration is green, the next major use case is an atomic warehouse transfer. It will move the same product between two warehouses in one transaction and record both sides of the operation in movement history.

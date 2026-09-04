@@ -75,7 +75,10 @@ public class ProductController {
   }
 
   @PutMapping("/{id}")
-  @Operation(summary = "Update a product", description = "Updates the mutable fields of an existing product. SKU and unit are immutable")
+  @Operation(
+      summary = "Update a product",
+      description =
+          "Updates the product name. SKU and unit are immutable, and inventory policy belongs to stock")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Product updated successfully"),
     @ApiResponse(

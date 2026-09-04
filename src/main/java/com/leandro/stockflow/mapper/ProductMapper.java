@@ -9,10 +9,6 @@ public class ProductMapper {
 
   public static ProductResponse toResponse(Product product) {
     return new ProductResponse(
-        product.getId(),
-        product.getSku(),
-        product.getName(),
-        product.getUnit(),
-        product.getMinimumStock());
+        product.getId(), product.getSku(), product.getName(), product.getUnit());
   }
 }

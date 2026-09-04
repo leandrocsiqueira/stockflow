@@ -10,9 +10,9 @@ Version 2 improves the quality of the existing system before adding broad new sc
 |---|---|---|
 | 0 | Freeze V1, start V2 branch, normalize line endings and establish documentation | Completed |
 | 1 | Refactor Product contracts and establish the V2 package/code pattern | Completed |
-| 2 | Improve Warehouse management API and contracts | In progress |
-| 3 | Move inventory policy from global product minimum to product plus warehouse policy | Planned |
-| 4 | Introduce reorder point and target stock | Planned |
+| 2 | Improve Warehouse management API and contracts | Completed |
+| 3 | Move inventory policy from global product minimum to product plus warehouse policy | In progress |
+| 4 | Introduce reorder point and target stock | In progress |
 | 5 | Implement atomic warehouse transfers | Planned |
 | 6 | Complete replenishment lifecycle with cancellation and stock receiving | Planned |
 | 7 | Add idempotency to critical inventory operations | Planned |
