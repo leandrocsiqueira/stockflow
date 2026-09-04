@@ -1,6 +1,7 @@
 package com.leandro.stockflow.service;
 
-import com.leandro.stockflow.dto.WarehouseRequest;
+import com.leandro.stockflow.dto.CreateWarehouseRequest;
+import com.leandro.stockflow.dto.UpdateWarehouseRequest;
 import com.leandro.stockflow.dto.WarehouseResponse;
 import com.leandro.stockflow.entity.Warehouse;
 import com.leandro.stockflow.exception.ResourceNotFoundException;
@@ -20,7 +21,7 @@ public class WarehouseService {
   }
 
   @Transactional
-  public WarehouseResponse create(WarehouseRequest request) {
+  public WarehouseResponse create(CreateWarehouseRequest request) {
     Warehouse warehouse = new Warehouse(request.name(), request.location());
     return WarehouseMapper.toResponse(warehouseRepository.save(warehouse));
   }
@@ -28,6 +29,19 @@ public class WarehouseService {
   @Transactional(readOnly = true)
   public List<WarehouseResponse> findAll() {
     return warehouseRepository.findAll().stream().map(WarehouseMapper::toResponse).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public WarehouseResponse findById(Long id) {
+    return WarehouseMapper.toResponse(getOrThrow(id));
+  }
+
+  @Transactional
+  public WarehouseResponse update(Long id, UpdateWarehouseRequest request) {
+    Warehouse warehouse = getOrThrow(id);
+    warehouse.setName(request.name());
+    warehouse.setLocation(request.location());
+    return WarehouseMapper.toResponse(warehouse);
   }
 
   protected Warehouse getOrThrow(Long id) {

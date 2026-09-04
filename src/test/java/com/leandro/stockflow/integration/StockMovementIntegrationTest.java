@@ -8,7 +8,7 @@ import com.leandro.stockflow.dto.ProductResponse;
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
 import com.leandro.stockflow.dto.StockResponse;
-import com.leandro.stockflow.dto.WarehouseRequest;
+import com.leandro.stockflow.dto.CreateWarehouseRequest;
 import com.leandro.stockflow.dto.WarehouseResponse;
 import com.leandro.stockflow.entity.MovementType;
 import com.leandro.stockflow.entity.Product;
@@ -69,7 +69,7 @@ class StockMovementIntegrationTest {
         productService.create(
             new CreateProductRequest("SKU-" + System.nanoTime(), "Test Widget", "unit", 10));
     WarehouseResponse warehouse =
-        warehouseService.create(new WarehouseRequest("Main Warehouse", "SP"));
+        warehouseService.create(new CreateWarehouseRequest("Main Warehouse", "SP"));
     productId = product.id();
     warehouseId = warehouse.id();
   }

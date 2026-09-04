@@ -109,7 +109,66 @@ Run the full Maven test suite with Docker available because `StockMovementIntegr
 mvn clean test
 ```
 
+### Validation result
+
+Stage 1 was validated successfully in the developer environment.
+
+```text
+Tests run: 55, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
 ### Next stage
 
-After Stage 1 is green and committed, Product query behavior will be reviewed before deciding whether package-by-feature migration should occur immediately or after Warehouse receives the same contract cleanup.
+Warehouse receives the same contract cleanup before larger domain changes begin.
+
+## Stage 2 - Warehouse API completeness
+
+### Problem
+
+V1 exposed only warehouse creation and full listing. There was no endpoint to retrieve one warehouse or update its catalog data. The same `WarehouseRequest` type also represented every write operation, making the contract less explicit than the Product contract established in Stage 1.
+
+### Decision
+
+Warehouse creation and update use separate request DTOs. The API now supports retrieving and updating a warehouse by ID. This makes the warehouse catalog usable by the frontend without adding lifecycle state prematurely.
+
+An `active` flag is intentionally not introduced in this stage. Disabling a warehouse has consequences for stock movements, transfers and replenishment. That rule will be introduced only when inventory policy is defined so the application does not expose a half-implemented lifecycle.
+
+### Changes
+
+`WarehouseRequest` is replaced by `CreateWarehouseRequest` and `UpdateWarehouseRequest`. `WarehouseService` adds `findById()` and `update()`, and `WarehouseController` exposes `GET /api/warehouses/{id}` and `PUT /api/warehouses/{id}`.
+
+Controller and service tests are added for creation, retrieval, update, validation and not-found behavior. The stock movement integration test is updated to use the new warehouse creation contract.
+
+### API examples
+
+Create request:
+
+```json
+{
+  "name": "Main Warehouse",
+  "location": "SP"
+}
+```
+
+Update request:
+
+```json
+{
+  "name": "Distribution Center",
+  "location": "MG"
+}
+```
+
+### Validation
+
+Run the complete Maven test suite with Docker available.
+
+```text
+mvn clean test
+```
+
+### Next stage
+
+After this stage is green and committed, the project moves into its first substantial domain migration: inventory policy will stop being globally attached to `Product` and will become specific to each product and warehouse combination.
 
