@@ -3,7 +3,7 @@ package com.leandro.stockflow.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.leandro.stockflow.dto.ProductRequest;
+import com.leandro.stockflow.dto.CreateProductRequest;
 import com.leandro.stockflow.dto.ProductResponse;
 import com.leandro.stockflow.dto.StockMovementRequest;
 import com.leandro.stockflow.dto.StockMovementResponse;
@@ -67,7 +67,7 @@ class StockMovementIntegrationTest {
   void setUp() {
     ProductResponse product =
         productService.create(
-            new ProductRequest("SKU-" + System.nanoTime(), "Test Widget", "unit", 10));
+            new CreateProductRequest("SKU-" + System.nanoTime(), "Test Widget", "unit", 10));
     WarehouseResponse warehouse =
         warehouseService.create(new WarehouseRequest("Main Warehouse", "SP"));
     productId = product.id();

@@ -1,6 +1,7 @@
 package com.leandro.stockflow.service;
 
-import com.leandro.stockflow.dto.ProductRequest;
+import com.leandro.stockflow.dto.CreateProductRequest;
+import com.leandro.stockflow.dto.UpdateProductRequest;
 import com.leandro.stockflow.dto.ProductResponse;
 import com.leandro.stockflow.entity.Product;
 import com.leandro.stockflow.exception.BusinessRuleException;
@@ -21,7 +22,7 @@ public class ProductService {
   }
 
   @Transactional
-  public ProductResponse create(ProductRequest request) {
+  public ProductResponse create(CreateProductRequest request) {
     productRepository
         .findBySku(request.sku())
         .ifPresent(
@@ -45,7 +46,7 @@ public class ProductService {
   }
 
   @Transactional
-  public ProductResponse update(Long id, ProductRequest request) {
+  public ProductResponse update(Long id, UpdateProductRequest request) {
     Product product = getOrThrow(id);
     product.setName(request.name());
     product.setMinimumStock(request.minimumStock());

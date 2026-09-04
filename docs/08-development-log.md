@@ -62,3 +62,54 @@ This stage changes no Java behavior or database schema. Validation consists of c
 ### Next stage
 
 Stage 1 will refactor Product API contracts. `ProductRequest` is currently reused for create and update even though `ProductService.update()` modifies only `name` and `minimumStock`. The V2 contract will make writable fields explicit and tests will be updated before any broader package reorganization.
+
+## Stage 1 - Product API contracts
+
+### Problem
+
+V1 used `ProductRequest` for both product creation and product update. The request required `sku`, `name`, `unit` and `minimumStock`, but `ProductService.update()` changed only `name` and `minimumStock`. As a result, the HTTP update contract required fields that the application intentionally ignored.
+
+### Decision
+
+Product creation and update now use different request DTOs. `sku` and `unit` are treated as immutable catalog identifiers after creation. This makes the API contract match the actual use case and prevents clients from believing these values can be changed through `PUT /api/products/{id}`.
+
+### Changes
+
+`ProductRequest` was replaced by `CreateProductRequest` and `UpdateProductRequest`. The controller and service now expose the specific contract required by each operation. The OpenAPI update description explicitly states that SKU and unit are immutable.
+
+Controller tests now cover the update endpoint and update validation. A new `ProductServiceTest` verifies creation, duplicate-SKU rejection, mutable-field updates and not-found behavior.
+
+### API examples
+
+Create request:
+
+```json
+{
+  "sku": "SKU-001",
+  "name": "Keyboard",
+  "unit": "UN",
+  "minimumStock": 5
+}
+```
+
+Update request:
+
+```json
+{
+  "name": "Mechanical Keyboard",
+  "minimumStock": 10
+}
+```
+
+### Validation
+
+Run the full Maven test suite with Docker available because `StockMovementIntegrationTest` uses Testcontainers.
+
+```text
+mvn clean test
+```
+
+### Next stage
+
+After Stage 1 is green and committed, Product query behavior will be reviewed before deciding whether package-by-feature migration should occur immediately or after Warehouse receives the same contract cleanup.
+

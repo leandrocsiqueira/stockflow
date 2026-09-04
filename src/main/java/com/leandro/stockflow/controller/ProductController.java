@@ -1,6 +1,7 @@
 package com.leandro.stockflow.controller;
 
-import com.leandro.stockflow.dto.ProductRequest;
+import com.leandro.stockflow.dto.CreateProductRequest;
+import com.leandro.stockflow.dto.UpdateProductRequest;
 import com.leandro.stockflow.dto.ProductResponse;
 import com.leandro.stockflow.exception.ApiError;
 import com.leandro.stockflow.service.ProductService;
@@ -49,7 +50,7 @@ public class ProductController {
         description = "Product SKU already exists",
         content = @Content(schema = @Schema(implementation = ApiError.class)))
   })
-  public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+  public ResponseEntity<ProductResponse> create(@Valid @RequestBody CreateProductRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(productService.create(request));
   }
 
@@ -74,7 +75,7 @@ public class ProductController {
   }
 
   @PutMapping("/{id}")
-  @Operation(summary = "Update a product", description = "Updates an existing product")
+  @Operation(summary = "Update a product", description = "Updates the mutable fields of an existing product. SKU and unit are immutable")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Product updated successfully"),
     @ApiResponse(
@@ -87,7 +88,7 @@ public class ProductController {
         content = @Content(schema = @Schema(implementation = ApiError.class)))
   })
   public ResponseEntity<ProductResponse> update(
-      @PathVariable Long id, @Valid @RequestBody ProductRequest request) {
+      @PathVariable Long id, @Valid @RequestBody UpdateProductRequest request) {
     return ResponseEntity.ok(productService.update(id, request));
   }
 }
