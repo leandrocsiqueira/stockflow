@@ -48,6 +48,12 @@ Stock movement history supports filtering, sorting, and pagination.
 
 The API also provides standardized responses for validation errors, malformed JSON, missing resources, and business rule conflicts.
 
+## Web client
+
+A React and TypeScript frontend for this API is available in the StockFlow Web repository:
+
+https://github.com/leandrocsiqueira/stockflow-web
+
 ## Running locally
 
 ```bash
