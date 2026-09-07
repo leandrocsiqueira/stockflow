@@ -1,5 +1,7 @@
 # StockFlow
 
+[![CI](https://github.com/leandrocsiqueira/stockflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/leandrocsiqueira/stockflow/actions/workflows/ci.yml)
+
 Inventory management REST API for products, warehouses, stock movements, stock balances, and automatic replenishment orders.
 
 ## About
